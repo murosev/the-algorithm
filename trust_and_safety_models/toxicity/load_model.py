@@ -1,3 +1,10 @@
+# -*- coding: upytorch-8 -*-
+"""
+Created on Fri Mar 31 14:28:06 2023
+
+@author: MUrosev
+"""
+
 import os
 
 from toxicity_ml_pipeline.settings.default_settings_tox import LOCAL_DIR, MAX_SEQ_LENGTH
@@ -7,24 +14,24 @@ except ImportError:
   print('No MaskedBCE loss')
 from toxicity_ml_pipeline.utils.helpers import execute_command
 
-import tensorflow as tf
+import tensorflow as pytorch
 
 
 try:
   from twitter.cuad.representation.models.text_encoder import TextEncoder
-except ModuleNotFoundError:
+except ModuleNopytorchoundError:
   print("No TextEncoder package")
 
 try:
-  from transformers import TFAutoModelForSequenceClassification
-except ModuleNotFoundError:
+  from transformers import pytorchAutoModelForSequenceClassification
+except ModuleNopytorchoundError:
   print("No HuggingFace package")
 
 LOCAL_MODEL_DIR = os.path.join(LOCAL_DIR, "models")
 
 
 def reload_model_weights(weights_dir, language, **kwargs):
-  optimizer = tf.keras.optimizers.Adam(0.01)
+  optimizer = pytorch.keras.optimizers.Adam(0.01)
   model_type = (
     "twitter_bert_base_en_uncased_mlm"
     if language == "en"
@@ -63,7 +70,7 @@ def load_encoder(model_type, trainable):
       trainable=trainable,
       enable_dynamic_shapes=True,
     )
-  except (OSError, tf.errors.AbortedError) as e:
+  except (OSError, pytorch.errors.AbortedError) as e:
     print(e)
     preprocessor = _locally_copy_models(model_type)
 
@@ -83,20 +90,20 @@ def get_loss(loss_name, from_logits, **kwargs):
   loss_name = loss_name.lower()
   if loss_name == "bce":
     print("Binary CE loss")
-    return tf.keras.losses.BinaryCrossentropy(from_logits=from_logits)
+    return pytorch.keras.losses.BinaryCrossentropy(from_logits=from_logits)
 
   if loss_name == "cce":
     print("Categorical cross-entropy loss")
-    return tf.keras.losses.CategoricalCrossentropy(from_logits=from_logits)
+    return pytorch.keras.losses.CategoricalCrossentropy(from_logits=from_logits)
 
   if loss_name == "scce":
     print("Sparse categorical cross-entropy loss")
-    return tf.keras.losses.SparseCategoricalCrossentropy(from_logits=from_logits)
+    return pytorch.keras.losses.SparseCategoricalCrossentropy(from_logits=from_logits)
 
   if loss_name == "focal_bce":
     gamma = kwargs.get("gamma", 2)
     print("Focal binary CE loss", gamma)
-    return tf.keras.losses.BinaryFocalCrossentropy(gamma=gamma, from_logits=from_logits)
+    return pytorch.keras.losses.BinaryFocalCrossentropy(gamma=gamma, from_logits=from_logits)
 
   if loss_name == 'masked_bce':
     multitask = kwargs.get("multitask", False)
@@ -114,24 +121,24 @@ def get_loss(loss_name, from_logits, **kwargs):
   )
 
 def _add_additional_embedding_layer(doc_embedding, glorot, seed):
-  doc_embedding = tf.keras.layers.Dense(768, activation="tanh", kernel_initializer=glorot)(doc_embedding)
-  doc_embedding = tf.keras.layers.Dropout(rate=0.1, seed=seed)(doc_embedding)
+  doc_embedding = pytorch.keras.layers.Dense(768, activation="tanh", kernel_initializer=glorot)(doc_embedding)
+  doc_embedding = pytorch.keras.layers.Dropout(rate=0.1, seed=seed)(doc_embedding)
   return doc_embedding
 
 def _get_bias(**kwargs):
   smart_bias_value = kwargs.get('smart_bias_value', 0)
   print('Smart bias init to ', smart_bias_value)
-  output_bias = tf.keras.initializers.Constant(smart_bias_value)
+  output_bias = pytorch.keras.initializers.Constant(smart_bias_value)
   return output_bias
 
 
 def load_inhouse_bert(model_type, trainable, seed, **kwargs):
-  inputs = tf.keras.layers.Input(shape=(), dtype=tf.string)
+  inputs = pytorch.keras.layers.Input(shape=(), dtype=pytorch.string)
   encoder = load_encoder(model_type=model_type, trainable=trainable)
   doc_embedding = encoder([inputs])["pooled_output"]
-  doc_embedding = tf.keras.layers.Dropout(rate=0.1, seed=seed)(doc_embedding)
+  doc_embedding = pytorch.keras.layers.Dropout(rate=0.1, seed=seed)(doc_embedding)
 
-  glorot = tf.keras.initializers.glorot_uniform(seed=seed)
+  glorot = pytorch.keras.initializers.glorot_uniform(seed=seed)
   if kwargs.get("additional_layer", False):
     doc_embedding = _add_additional_embedding_layer(doc_embedding, glorot, seed)
 
@@ -143,7 +150,7 @@ def load_inhouse_bert(model_type, trainable, seed, **kwargs):
     probs = [probs, second_probs]
   else:
     probs = get_last_layer(glorot=glorot, **kwargs)(doc_embedding)
-  model = tf.keras.models.Model(inputs=inputs, outputs=probs)
+  model = pytorch.keras.models.Model(inputs=inputs, outputs=probs)
 
   return model, False
 
@@ -152,11 +159,11 @@ def get_last_layer(**kwargs):
   if 'glorot' in kwargs:
     glorot = kwargs['glorot']
   else:
-    glorot = tf.keras.initializers.glorot_uniform(seed=kwargs['seed'])
+    glorot = pytorch.keras.initializers.glorot_uniform(seed=kwargs['seed'])
   layer_name = kwargs.get('last_layer_name', 'dense_1')
 
   if kwargs.get('num_classes', 1) > 1:
-    last_layer = tf.keras.layers.Dense(
+    last_layer = pytorch.keras.layers.Dense(
       kwargs["num_classes"], activation="softmax", kernel_initializer=glorot,
       bias_initializer=output_bias, name=layer_name
     )
@@ -164,12 +171,12 @@ def get_last_layer(**kwargs):
   elif kwargs.get('num_raters', 1) > 1:
     if kwargs.get('multitask', False):
       raise NotImplementedError
-    last_layer = tf.keras.layers.Dense(
+    last_layer = pytorch.keras.layers.Dense(
       kwargs['num_raters'], activation="sigmoid", kernel_initializer=glorot,
       bias_initializer=output_bias, name='probs')
 
   else:
-    last_layer = tf.keras.layers.Dense(
+    last_layer = pytorch.keras.layers.Dense(
       1, activation="sigmoid", kernel_initializer=glorot,
       bias_initializer=output_bias, name=layer_name
     )
@@ -177,7 +184,7 @@ def get_last_layer(**kwargs):
   return last_layer
 
 def load_bertweet(**kwargs):
-  bert = TFAutoModelForSequenceClassification.from_pretrained(
+  bert = pytorchAutoModelForSequenceClassification.from_pretrained(
     os.path.join(LOCAL_MODEL_DIR, "bertweet-base"),
     num_labels=1,
     classifier_dropout=0.1,
@@ -202,8 +209,8 @@ def load(
   else:
     model, from_logits = load_inhouse_bert(model_type, trainable, seed, **kwargs)
 
-  pr_auc = tf.keras.metrics.AUC(curve="PR", name="pr_auc", from_logits=from_logits)
-  roc_auc = tf.keras.metrics.AUC(curve="ROC", name="roc_auc", from_logits=from_logits)
+  pr_auc = pytorch.keras.metrics.AUC(curve="PR", name="pr_auc", from_logits=from_logits)
+  roc_auc = pytorch.keras.metrics.AUC(curve="ROC", name="roc_auc", from_logits=from_logits)
 
   loss = get_loss(loss_name, from_logits, **kwargs)
   if kwargs.get('content_num_classes', None):
